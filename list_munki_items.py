@@ -10,10 +10,12 @@ import sys
 from urllib.parse import urlparse
 
 def get_options():
-    parser = argparse.ArgumentParser(description='Lists latest versions of unique items in the Munki repo. By default, fetches only items that are optional installs in any manifests.')
+    parser = argparse.ArgumentParser(description='Lists latest versions of unique items in the Munki repo. By default, fetches only items that are optional installs in any manifests. Will output a .csv to your desktop folder.')
     parser.add_argument('--managedinstalls', help='The list of items will also include managed installs items', action='store_true')
     parser.add_argument('--featuredoptionals', help='The list of items will exclude optional installs that are not featured', action='store_true')
     parser.add_argument('--onlycatalog', help='Include items from only this catalog')
+    parser.add_argument('--repofolder', help='Specify a Munki repo folder, instead of having the script try to autodetect the repo based on munkiimport settings. This may be particularly helpful if your repo is a network share mounted via SMB.')
+    parser.add_argument('--csvname', help='By default, the output filename will be munki_items_available.csv. Use this flag to specify a different name.')
     args = parser.parse_args()
     if args.managedinstalls:
         managed = True
@@ -27,7 +29,15 @@ def get_options():
         onlycatalog = args.onlycatalog
     else:
         onlycatalog = False
-    return managed,featured,onlycatalog
+    if args.repofolder:
+        repofolder = args.repofolder
+    else:
+        repofolder = False
+    if args.csvname:
+        csvname = args.csvname
+    else:
+        csvname = False
+    return managed,featured,onlycatalog,repofolder,csvname
 
 def get_repo():
     try:
@@ -150,8 +160,11 @@ def get_items_info(repo, list_items, onlycatalog):
                         if onlycatalog and 'catalogs' in pkginfo_contents.keys() and onlycatalog in pkginfo_contents['catalogs']:
                             list_items[pkginfo_contents['name']]['catalog'] = True
 
-def write_csv(list_items, onlycatalog):
-    csv_file = os.path.expanduser('~/Desktop/munki_items_available.csv')
+def write_csv(list_items, csvname, onlycatalog):
+    if csvname:
+        csv_file = os.path.join(os.path.expanduser('~/Desktop'), csvname)
+    else:
+        csv_file = os.path.expanduser('~/Desktop/munki_items_available.csv')
     if os.path.exists(csv_file):
         print('ERROR: file {} already exists. Exiting...'.format(csv_file))
         sys.exit(1)
@@ -166,15 +179,18 @@ def write_csv(list_items, onlycatalog):
     print('\nCSV available at {}'.format(csv_file))
 
 def main():
-    # Get the URL for the Munki repo
-    repo = get_repo()
-    if not repo:
-        print('ERROR: Unable to obtain repo_url for Munki. Run\n\nmunkiimport --configure\n\nto set the URL')
-        sys.exit(1)
-    print('\nUsing repo {}\n'.format(repo))
-
     # Get options
-    managed,featured,onlycatalog = get_options()
+    managed,featured,onlycatalog,repofolder,csvname = get_options()
+
+    # Get the URL for the Munki repo
+    if repofolder:
+        repo = repofolder
+    else:
+        repo = get_repo()
+        if not repo:
+            print('ERROR: Unable to obtain repo_url for Munki. Run\n\nmunkiimport --configure\n\nto set the URL')
+            sys.exit(1)
+    print('\nUsing repo {}\n'.format(repo))
 
     # Get dictionary of items used in manifests
     list_items = get_manifest_usage(repo, managed, featured)
@@ -183,7 +199,7 @@ def main():
     get_items_info(repo, list_items, onlycatalog)
 
     # Write the relevant info back to a CSV
-    write_csv(list_items, onlycatalog)
+    write_csv(list_items, csvname, onlycatalog)
 
 if __name__ == '__main__':
     main()

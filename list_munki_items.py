@@ -2,12 +2,14 @@
 
 import argparse
 import csv
-from distutils.version import LooseVersion
 from Foundation import CFPreferencesCopyAppValue
 import os
 import plistlib
 import sys
 from urllib.parse import urlparse
+if not "/usr/local/munki" in sys.path:
+    sys.path.append("/usr/local/munki")
+from munkilib.pkgutils import MunkiLooseVersion
 
 def get_options():
     parser = argparse.ArgumentParser(description='Lists latest versions of unique items in the Munki repo. By default, fetches only items that are optional installs in any manifests. Will output a .csv to your desktop folder.')
@@ -146,7 +148,7 @@ def get_items_info(repo, list_items, onlycatalog):
                     if (('version' not in list_items[pkginfo_contents['name']].keys())
                         # Or it does exist and this is now a higher version...
                         or ('version' in list_items[pkginfo_contents['name']].keys()
-                            and LooseVersion(list_items[pkginfo_contents['name']]['version']) < LooseVersion(pkginfo_contents['version']))):
+                            and MunkiLooseVersion(list_items[pkginfo_contents['name']]['version']) < MunkiLooseVersion(pkginfo_contents['version']))):
                         # Up the version
                         list_items[pkginfo_contents['name']]['version'] = pkginfo_contents['version']
                         # Update the description
